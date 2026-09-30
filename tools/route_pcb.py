@@ -30,8 +30,8 @@ def netclass(name, width, clear, via=0.45, drill=0.2):
     return nc
 
 
-netclass("HS", 0.20, 0.15, 0.4, 0.2)
-netclass("PWR", 0.25, 0.14, 0.5, 0.25)
+netclass("HS", 0.20, 0.10, 0.4, 0.2)
+netclass("PWR", 0.25, 0.10, 0.5, 0.25)
 HS = ("/USB_TX", "/USB_RX", "/U_TX", "/P_TX", "/PCIE_", "/REFCLK_", "/USB_DP", "/USB_DM")
 PWR = ("/VBUS", "/+3V3", "/+1V0", "/LXO", "/+3V3_JMS")
 for pat in HS:
@@ -45,7 +45,7 @@ ses = os.path.join(HW, "cartouche-drive.ses")
 if not pcbnew.ExportSpecctraDSN(board, dsn):
     sys.exit("DSN export failed")
 print("DSN exported, routing…", flush=True)
-r = subprocess.run(["java", "-jar", JAR, "-de", dsn, "-do", ses, "-mp", "30", "-host-mode", "cli"],
+r = subprocess.run(["java", "-jar", JAR, "-de", dsn, "-do", ses, "-mp", "100", "-host-mode", "cli"],
                    capture_output=True, text=True, timeout=1500)
 print(r.stdout[-1500:], r.stderr[-1500:])
 if not os.path.exists(ses):
@@ -53,21 +53,33 @@ if not os.path.exists(ses):
 if not pcbnew.ImportSpecctraSES(board, ses):
     sys.exit("SES import failed")
 
-# ground pours on both outer layers, then fill every zone
-W, H = 30.0, 66.0
-for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
+# pours: F.Cu ground; B.Cu split in two, VBUS on the left (USB-C, regulator input) and
+# +3V3 on the right (regulator output, M.2 supply pins); the boundary runs between U2's VIN and VOUT.
+W, H = 36.0, 46.0
+u2 = {p.GetNumber(): pcbnew.ToMM(p.GetPosition().x) for f in board.GetFootprints() if f.GetReference() == "U2" for p in f.Pads()}
+XB = round((u2["2"] + min(u2["4"], u2["5"])) / 2, 2)
+
+
+def pour(layer, netname, pts, prio):
     z = pcbnew.ZONE(board)
     z.SetLayer(layer)
-    z.SetNet(board.FindNet("/GND"))
+    z.SetNet(board.FindNet(netname))
     z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
     ol = z.Outline()
     ol.NewOutline()
-    for x, y in ((0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (0.3, H - 0.3)):
+    for x, y in pts:
         ol.Append(mm(x), mm(y))
     z.SetMinThickness(mm(0.2))
-    z.SetLocalClearance(mm(0.2))
-    z.SetAssignedPriority(0)
+    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    z.SetLocalClearance(mm(0.15))
+    z.SetAssignedPriority(prio)
     board.Add(z)
+
+
+pour(pcbnew.F_Cu, "/GND", [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (0.3, H - 0.3)], 0)
+pour(pcbnew.B_Cu, "/VBUS", [(0.3, 0.3), (XB - 0.2, 0.3), (XB - 0.2, H - 0.3), (0.3, H - 0.3)], 1)
+pour(pcbnew.B_Cu, "/+3V3", [(XB + 0.2, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (XB + 0.2, H - 0.3)], 1)
 pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 board.Save(PCB)
 print("routed and saved", PCB)

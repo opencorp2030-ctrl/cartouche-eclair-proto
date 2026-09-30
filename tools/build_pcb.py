@@ -148,6 +148,8 @@ def free(b):
         return False
     if b[3] > 27.3 and b[1] < 32.4 and b[0] < 28.8 and b[2] > 19.8:      # PCIe channel: kept for the pairs
         return False
+    if b[2] > 8.8 and b[0] < 20.0 and b[3] > 20.2 and b[1] < 28.2:       # USB channel: kept for the pairs
+        return False
     return all(b[2] <= o[0] or b[0] >= o[2] or b[3] <= o[1] or b[1] >= o[3] for o in occupied)
 
 
@@ -227,6 +229,8 @@ def pad_of(ref, num):
 
 
 def track(a, b, netname, w=0.2, layer=pcbnew.F_Cu):
+    if abs(a[0] - b[0]) < 1e-3 and abs(a[1] - b[1]) < 1e-3:
+        return
     t = pcbnew.PCB_TRACK(board)
     t.SetStart(P(*a)); t.SetEnd(P(*b)); t.SetWidth(mm(w)); t.SetLayer(layer)
     t.SetNet(net(netname)); t.SetLocked(True)
@@ -250,7 +254,7 @@ CAPS = {"37": ("C37", 0), "38": ("C36", 1), "44": ("C35", 0), "45": ("C34", 1)} 
 yj = xy(pad_of("J2", "29"))[1]
 y0 = xy(pad_of("U1", "34"))[1] + 0.45            # just past the chip pads
 yjog = y0 + 0.55
-ycap = [yjog + 0.7, yjog + 1.8]
+ycap = [yjog + 0.6, yjog + 2.05]
 for up, jp in PAIRS:
     a, b = pad_of("U1", up), pad_of("J2", jp)
     (xa, ya), (xb, yb) = xy(a), xy(b)
@@ -272,12 +276,111 @@ for up, jp in PAIRS:
         track((xb, yjog), (xb, yb), n)
 
 # 1.0 V pins and REXT on the PCIe side: short stub inwards to a via in the ring
-for num, off in (("33", 2.75), ("36", 2.75), ("39", 3.1), ("40", 2.75), ("43", 2.75), ("46", 2.75)):
+for num, off in (("33", 3.1), ("36", 2.75), ("39", 3.1), ("40", 2.75), ("43", 2.75), ("46", 2.75)):
     p = pad_of("U1", num)
     x, y = xy(p)
     vy = ucy + off
     track((x, y), (x, vy), p.GetNetname(), 0.15)
     via(x, vy, p.GetNetname())
+
+
+# ---------------------------------------------------------------- USB 3.2 pairs, routed by the script
+# USB-C rows: A (inner, towards the chip) and B (outer). A B-row pad is reached through a
+# via placed exactly between the two rows (0.6 mm gap: 0.4 mm via + 0.1 mm each side).
+# TX1 and RX2 go straight to the A row on F.Cu; TX2 and RX1 cross each other, so they
+# drop to B.Cu (over the In2 ground plane) and come up at their B-row vias.
+jx = xy(fps["J1"])[0]
+def jpad(n):
+    return xy(pad_of("J1", n))
+BETWEEN = 0.65                                     # from a B pad towards the A row
+for n in ["B1", "B12", "B4", "B9", "B5", "B6", "B7", "B10", "B11", "B2", "B3"]:
+    x, y = jpad(n)
+    netn = pad_of("J1", n).GetNetname()
+    track((x, y), (x + BETWEEN, y), netn, 0.2)
+    via(x + BETWEEN, y, netn)
+for a_, b_ in (("A1", "B12"), ("A12", "B1"), ("A4", "B9"), ("A9", "B4")):   # A-row ground / VBUS:
+    xa_, ya_ = jpad(a_)                              # joined to the via of the facing B-row pad
+    xb_, yb_ = jpad(b_)
+    track((xa_, ya_), (xb_ + BETWEEN, yb_), pad_of("J1", a_).GetNetname(), 0.2)
+
+for n_, vx_ in (("A5", 9.35), ("A6", 9.95), ("A7", 9.35)):   # CC1, D+, D-: vias towards the chip, staggered
+    x_, y_ = jpad(n_)
+    netn = pad_of("J1", n_).GetNetname()
+    track((x_, y_), (vx_, y_), netn, 0.2)
+    via(vx_, y_, netn)
+
+
+def u(n):
+    return xy(pad_of("U1", n))
+
+
+def place_cap(ref, x, y, net_in):
+    c = fps[ref]
+    c.SetOrientationDegrees(0)
+    c.SetPosition(P(x, y))
+    q = sorted([p for p in c.Pads() if p.GetNumber() in ("1", "2")], key=lambda p: -pcbnew.ToMM(p.GetPosition().x))
+    if q[0].GetNetname() != net_in:
+        c.SetOrientationDegrees(180)
+        q = sorted([p for p in c.Pads() if p.GetNumber() in ("1", "2")], key=lambda p: -pcbnew.ToMM(p.GetPosition().x))
+    return xy(q[0]), xy(q[1]), q[1].GetNetname()     # pad towards the chip, pad towards the connector
+
+
+# TX1: chip 21 (P) / 22 (N) -> C1 / C2 -> A2 / A3, straight on F.Cu
+for pin, cap, cx, jp in (("21", "C1", 17.2, "A2"), ("22", "C2", 15.8, "A3")):
+    (xa, ya) = u(pin)
+    n = pad_of("U1", pin).GetNetname()
+    pin_in, pin_out, n2 = place_cap(cap, cx, ya, n)
+    track((xa, ya), pin_in, n)
+    xj, yj = jpad(jp)
+    track(pin_out, (xj + 1.6, ya), n2)
+    track((xj + 1.6, ya), (xj + 1.6 - abs(yj - ya), yj), n2)
+    track((xj + 1.6 - abs(yj - ya), yj), (xj, yj), n2)
+
+# TX2: chip 23 (N) / 24 (P) -> C4 / C3 -> F.Cu left, jog down, vias -> B.Cu -> B3 / B2 vias
+for pin, cap, cx, dy, vx, jp, jx0 in (("23", "C4", 17.2, 0.7, 11.0, "B3", 14.8), ("24", "C3", 15.8, 0.7, 11.6, "B2", 14.97)):
+    (xa, ya) = u(pin)
+    n = pad_of("U1", pin).GetNetname()
+    pin_in, pin_out, n2 = place_cap(cap, cx, ya, n)
+    track((xa, ya), pin_in, n)
+    track(pin_out, (jx0, ya), n2)                   # 45 degree step, P offset so the pair keeps its gap
+    track((jx0, ya), (jx0 - dy, ya + dy), n2)
+    track((jx0 - dy, ya + dy), (vx, ya + dy), n2)
+    via(vx, ya + dy, n2)
+    xj, yj = jpad(jp)
+    track((vx, ya + dy), (vx, yj), n2, 0.2, pcbnew.B_Cu)
+    track((vx, yj), (xj + BETWEEN, yj), n2, 0.2, pcbnew.B_Cu)
+
+# RX1: chip 26 (P) / 27 (N) -> vias -> B.Cu up and left -> B11 / B10 vias
+for pin, vx, jp in (("26", 16.6, "B11"), ("27", 16.0, "B10")):
+    (xa, ya) = u(pin)
+    n = pad_of("U1", pin).GetNetname()
+    track((xa, ya), (vx, ya), n)
+    via(vx, ya, n)
+    xj, yj = jpad(jp)
+    track((vx, ya), (vx, yj), n, 0.2, pcbnew.B_Cu)
+    track((vx, yj), (xj + BETWEEN, yj), n, 0.2, pcbnew.B_Cu)
+
+# RX2: chip 28 (N) / 29 (P) -> A10 / A11 on F.Cu, one step down with square corners
+for pin, vx, jp in (("28", 17.6, "A10"), ("29", 18.0, "A11")):
+    (xa, ya) = u(pin)
+    n = pad_of("U1", pin).GetNetname()
+    xj, yj = jpad(jp)
+    track((xa, ya), (vx, ya), n)
+    track((vx, ya), (vx, yj), n)
+    track((vx, yj), (xj, yj), n)
+
+# power pins on the USB side: stubs inwards to ring vias (staggered)
+for num, off in (("19", 3.1), ("20", 2.75), ("25", 2.75), ("30", 3.1), ("31", 2.75)):   # (33 is below, at 3.1)
+    p = pad_of("U1", num)
+    x, y = xy(p)
+    vx = ucx - off
+    track((x, y), (vx, y), p.GetNetname(), 0.15)
+    via(vx, y, p.GetNetname())
+# VCCO (pin 32, corner of the USB side): via just outside the pad, clear of the RX2 pair
+p = pad_of("U1", "32")
+x, y = xy(p)
+track((x, y), (x - 1.14, y + 0.2), p.GetNetname(), 0.15)
+via(x - 1.14, y + 0.2, p.GetNetname())
 
 # outline with rounded corners
 R = 1.5
@@ -322,7 +425,9 @@ def plane(layer, netname, y0, y1, prio=0):
     for x, y in ((0.3, y0), (W - 0.3, y0), (W - 0.3, y1), (0.3, y1)):
         ol.Append(mm(x), mm(y))
     z.SetMinThickness(mm(0.2))
-    z.SetLocalClearance(mm(0.25))
+    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    z.SetLocalClearance(mm(0.15))
     z.SetAssignedPriority(prio)
     board.Add(z)
 
@@ -346,13 +451,14 @@ def poly(layer, netname, pts, prio):
     for x, y in pts:
         ol.Append(mm(x), mm(y))
     z.SetMinThickness(mm(0.2))
-    z.SetLocalClearance(mm(0.25))
+    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+    z.SetLocalClearance(mm(0.15))
     z.SetAssignedPriority(prio)
     board.Add(z)
 
 
-poly(pcbnew.In2_Cu, "/VBUS", [(0.3, 0.3), (XB - 0.2, 0.3), (XB - 0.2, H - 0.3), (0.3, H - 0.3)], 1)
-poly(pcbnew.In2_Cu, "/+3V3", [(XB + 0.2, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (XB + 0.2, H - 0.3)], 1)
+plane(pcbnew.In2_Cu, "/GND", 0.3, H - 0.3)
 
 
 def region_ok(netname, x, y):
@@ -366,6 +472,28 @@ def region_ok(netname, x, y):
 # fanout: a via next to every pad of a plane net (GND, VBUS, +3V3), thermal vias in exposed pads
 allpads = [p for f in board.GetFootprints() for p in f.Pads()]
 vias = []
+
+
+def seg_dist(px, py, ax, ay, bx, by):
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0 if L2 == 0 else max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / L2))
+    return ((px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2) ** 0.5
+
+
+def clear_of_tracks(x, y, netname, r):
+    for t in board.GetTracks():
+        if t.GetNetname() == netname:
+            continue
+        if t.Type() == pcbnew.PCB_VIA_T:
+            vx, vy = pcbnew.ToMM(t.GetPosition().x), pcbnew.ToMM(t.GetPosition().y)
+            if ((x - vx) ** 2 + (y - vy) ** 2) ** 0.5 < r + pcbnew.ToMM(t.GetWidth(pcbnew.F_Cu)) / 2 + 0.1:
+                return False
+            continue
+        a, b = t.GetStart(), t.GetEnd()
+        if seg_dist(x, y, pcbnew.ToMM(a.x), pcbnew.ToMM(a.y), pcbnew.ToMM(b.x), pcbnew.ToMM(b.y)) < r + pcbnew.ToMM(t.GetWidth()) / 2 + 0.1:
+            return False
+    return True
 
 
 def clear_of_pads(x, y, netname, r=0.45):
@@ -400,6 +528,8 @@ def add_via(x, y, netname, pad=None, tw=0.25):
 import math
 for f in board.GetFootprints():
     fc = f.GetPosition()
+    if f.GetReference() == "J1":
+        continue
     for p in f.Pads():
         n = p.GetNetname()
         if n not in ("/GND", "/VBUS", "/+3V3") or p.GetAttribute() not in (pcbnew.PAD_ATTRIB_SMD,):
@@ -433,13 +563,15 @@ for f in board.GetFootprints():
         else:
             base = math.atan2(dy, dx) if (dx or dy) else 0
             angles = [base + (k // 2) * (math.pi / 6) * (1 if k % 2 else -1) for k in range(12)]
-            dists = (0.75, 0.95, 1.2, 1.5)
+            dists = (0.75, 0.95, 1.2, 1.5, 1.9, 2.4)
         done = False
         for d in dists:
             for a in angles:
                 x, y = round(px + d * math.cos(a), 2), round(py + d * math.sin(a), 2)
-                if region_ok(n, x, y) and clear_of_pads(x, y, n):
-                    add_via(x, y, n, p, 0.18 if fine else 0.25)
+                tw = 0.18 if fine else 0.25
+                stub_ok = all(clear_of_tracks(px + (x - px) * k, py + (y - py) * k, n, tw / 2) for k in (0.3, 0.6, 1.0))
+                if region_ok(n, x, y) and clear_of_pads(x, y, n) and clear_of_tracks(x, y, n, 0.2) and stub_ok:
+                    add_via(x, y, n, p, tw)
                     done = True
                     break
             if done:
