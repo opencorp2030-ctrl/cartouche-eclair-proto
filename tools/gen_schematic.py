@@ -143,6 +143,8 @@ C("C42", "100nF", "C1525", (380, 290), "+3V3", "GND")
 for i, x in enumerate(range(360, 400, 10)):                          # M.2 3.3 V pins
     C(f"C{43+i}", "10uF", "C15525", (x, 110), "+3V3", "GND")
 
+part("H1", "Mechanical:MountingHole_Pad", "M2 standoff (SSD)", "MountingHole:MountingHole_2.2mm_M2_Pad_Via", "", (60, 330), {1: "GND"})
+
 # power flags: tell ERC which nets are supplied
 for i, (net, x) in enumerate([("VBUS", 40), ("+3V3", 60), ("+3V3_JMS", 80), ("+1V0", 100), ("GND", 120)]):
     part(f"#FLG{i+1}", "power:PWR_FLAG", "PWR_FLAG", "", "", (x, 350), {1: net})
@@ -216,7 +218,7 @@ for p in PARTS:
                  for i, (k, v) in enumerate(props))
     pins = pins_of(p["sym"])
     pin_uuids = "".join(f'\n    (pin "{n}" (uuid "{U()}"))' for n in pins)
-    out.append(f'  (symbol (lib_id "{p["sym"]}") (at {x} {y} 0) (unit 1) (exclude_from_sim no) (in_bom {"no" if power else "yes"}) '
+    out.append(f'  (symbol (lib_id "{p["sym"]}") (at {x} {y} 0) (unit 1) (exclude_from_sim no) (in_bom {"no" if (power or p["ref"].startswith("H")) else "yes"}) '
                f'(on_board {"no" if power else "yes"}) (dnp {"yes" if p["dnp"] else "no"}) (uuid "{U()}"){ps}{pin_uuids}\n'
                f'    (instances (project "{PROJECT}" (path "/{ROOT_UUID}" (reference "{p["ref"]}") (unit 1)))))')
     for num, spots in pins.items():

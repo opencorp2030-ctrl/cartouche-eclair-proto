@@ -9,3 +9,7 @@ hardware/*.net
 # never commit vendor datasheets (copyrighted) — link them in the README
 *.pdf
 !hardware/cartouche-drive-schematic.pdf
+hardware/*.dsn
+hardware/*.ses
+hardware/drc.rpt
+hardware/*.svg

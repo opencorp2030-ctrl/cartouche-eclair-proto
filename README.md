@@ -4,7 +4,7 @@ A small USB-C drive for an M.2 2230 NVMe SSD, built around the JMicron JMS583
 bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive for
 [CARTOUCHE](https://cartouche.candygate.eu), a local AI that runs from a USB drive.
 
-**Status:** schematic v0.1 (ERC clean). PCB layout: next step.
+**Status:** schematic v0.1 (ERC clean). PCB: draft v0.1 — placement, 4-layer stack, ground and power planes done; autorouted draft **not for fabrication** (the 10 Gb/s pairs still have to be routed as coupled, length-matched pairs).
 
 ## Blocks
 
@@ -21,6 +21,8 @@ bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive fo
 - `hardware/` — KiCad 9 project (`cartouche-drive.kicad_sch`), local libraries in `hardware/lib/`
 - `hardware/cartouche-drive-schematic.pdf` — schematic export
 - `tools/gen_schematic.py` — the connection list that generates the schematic
+- `tools/build_pcb.py` — board, placement, planes and fan-out vias (KiCad Python)
+- `tools/route_pcb.py` — net classes and Freerouting run
 
 ## References
 
