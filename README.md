@@ -18,7 +18,9 @@ bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive fo
 
 **Status:** schematic v0.1 (ERC 0). PCB v0.4 — 36 × 46 mm, 4 layers (In1 GND, In2 GND + 1.0 V island), 9 high-speed pairs as straight coupled pairs (USB 0.2/0.1 mm, estimated ≈94 Ω — to be checked with JLCPCB's impedance calculator), GND stitching. DRC: 0 unconnected, 0 schematic mismatch, 2 silkscreen warnings. Fabrication files in `hardware/fab/` (Gerbers zip, JLCPCB BOM and CPL). **Prototype, not verified:** JMS583 must be consigned (0 stock at JLCPCB), CPL rotations to check in the JLCPCB viewer, LED polarity assumed active-low.
 
-![PCB v0.3, top and bottom copper](docs/images/pcb-v03-top.png) ![bottom](docs/images/pcb-v03-bottom.png)
+![PCB v0.4, 3D view](docs/images/pcb-v04-3d-iso.png)
+
+![top copper](docs/images/pcb-v04-top.png) ![bottom copper](docs/images/pcb-v04-bottom.png)
 
 ## Blocks
 
