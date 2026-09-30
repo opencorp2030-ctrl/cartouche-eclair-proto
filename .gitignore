@@ -13,3 +13,4 @@ hardware/*.dsn
 hardware/*.ses
 hardware/drc.rpt
 hardware/*.svg
+__pycache__/

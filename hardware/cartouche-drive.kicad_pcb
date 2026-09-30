@@ -8037,15 +8037,15 @@
 			)
 		)
 		(embedded_fonts no)
-		(model "${KICAD9_3DMODEL_DIR}/Connector_USB.3dshapes/USB_C_Receptacle_Molex_105450-0101.step"
+		(model "${KIPRJMOD}/lib/cartouche.3dshapes/USB-C-SMD_TYPE-C-USB-18.wrl"
 			(offset
-				(xyz 0 0 0)
+				(xyz 0 0.355 0)
 			)
 			(scale
 				(xyz 1 1 1)
 			)
 			(rotate
-				(xyz 0 0 0)
+				(xyz 0 0 180)
 			)
 		)
 	)
