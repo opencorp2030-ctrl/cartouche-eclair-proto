@@ -72,8 +72,10 @@ for n in (1, 3, 9, 15, 21, 27, 33, 39, 45, 51, 57, 71, 73, 75, 76, 77):
     m2[n] = "GND"
 for n in (2, 4, 12, 14, 16, 18, 70, 72, 74):
     m2[n] = "+3V3"
-m2.update({29: "PCIE_TXN1_M2", 31: "PCIE_TXP1_M2", 35: "PCIE_RXN1", 37: "PCIE_RXP1",
-           41: "PCIE_TXN0_M2", 43: "PCIE_TXP0_M2", 47: "PCIE_RXN0", 49: "PCIE_RXP0",
+# M.2 names are from the host side: PET = host transmits (our TX, through the 220 nF caps),
+# PER = host receives (the SSD's TX, already AC-coupled on the SSD).
+m2.update({29: "PCIE_RXN1", 31: "PCIE_RXP1", 35: "PCIE_TXN1_M2", 37: "PCIE_TXP1_M2",
+           41: "PCIE_RXN0", 43: "PCIE_RXP0", 47: "PCIE_TXN0_M2", 49: "PCIE_TXP0_M2",
            50: "PERST", 52: "CLKREQ", 53: "REFCLK_N", 55: "REFCLK_P"})
 part("J2", "cartouche:APCI0113-P001A", "M.2 key M (2230)", "cartouche:CONN-SMD_APCI0113-P001A", "C841669", (330, 150), m2)
 

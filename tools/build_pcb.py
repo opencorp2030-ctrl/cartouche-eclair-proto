@@ -6,9 +6,10 @@ Steps: read the netlist, load every footprint, place it, assign the nets,
 draw the outline, set the 4-layer stack and design rules, add the ground
 planes, then export a Specctra DSN for Freerouting.
 
-Board frame (mm, KiCad y goes down): 30 x 66 mm. The M.2 2230 SSD lies over
-the top part of the board (on its 4.75 mm connector and an M2 standoff), the
-JMS583 sits under the connector, the USB-C receptacle is on the bottom edge.
+Board frame (mm, KiCad y goes down): 36 x 46 mm. The M.2 2230 SSD lies over the
+right part of the board (on its 4.75 mm connector and an M2 standoff). The JMS583
+sits under the SSD with its PCIe side facing the socket's PCIe pins (same order,
+no crossing); the USB-C receptacle is on the left edge, facing the USB side.
 """
 import os
 import re
@@ -20,7 +21,7 @@ HW = os.path.join(os.path.dirname(HERE), "hardware")
 KFP = r"C:\Program Files\KiCad\9.0\share\kicad\footprints"
 NET = os.path.join(HW, "cartouche-drive.net")
 OUT = os.path.join(HW, "cartouche-drive.kicad_pcb")
-W, H = 30.0, 66.0
+W, H = 36.0, 46.0
 
 mm = pcbnew.FromMM
 
@@ -46,13 +47,14 @@ for m in re.finditer(r'\(net \(code "\d+"\) \(name "([^"]+)"\)(.*?)(?=\(net \(co
 # Big parts are placed by hand; every small part is then placed automatically
 # as close as possible to the pad it serves (same net on a big part), without
 # overlapping anything (courtyards + 0.25 mm), on a 0.25 mm grid.
+JX = 23.24                       # socket centre: puts the socket's PCIe pins right under the chip's
 PLACE = {
-    "J2": (15.0, 34.25, 0),      # M.2 socket; card edge at y 34.0, SSD up to y 4.0
-    "U1": (15.0, 50.0, 90),      # JMS583: PCIe side faces the socket
-    "J1": (15.0, 61.2, 0),       # USB-C on the bottom edge
-    "U2": (25.2, 22.0, 270),      # SSD 3.3 V buck (VIN pads towards the right edge / VBUS strip)
-    "C41": (25.0, 58.5, 90),     # 330 uF tantalum (3.1 mm tall: outside the SSD shadow)
-    "H1": (15.0, 4.0, 0),        # M2 standoff at the far end of a 2230 card
+    "J2": (JX, 36.0, 0),         # M.2 socket; card edge at y 35.75, SSD up to y 5.75
+    "H1": (JX, 5.75, 0),         # M2 standoff at the far end of a 2230 card
+    "U1": (24.0, 23.8, 270),     # JMS583, PCIe side down (towards J2), USB side left (towards J1)
+    "J1": (5.0, 24.8, 270),      # USB-C, mouth on the left edge
+    "U2": (11.7, 10.0, 90),      # SSD 3.3 V buck: VIN on the VBUS side (left), VOUT on the +3V3 side
+    "C41": (JX, 43.5, 0),        # 330 uF tantalum (3.1 mm tall): below the socket, outside the SSD
 }
 BIG = ["J2", "U1", "J1", "U2", "C41", "H1"]
 NEAR = {"Y1": ("U1", "50"), "U3": ("U1", "5"), "L1": ("U1", "64"), "LED1": ("U1", "8"),
@@ -86,7 +88,7 @@ ds.m_ViasMinAnnularWidth = mm(0.075)
 ds.SetBoardThickness(mm(1.6))
 nc = ds.m_NetSettings.GetDefaultNetclass()
 nc.SetTrackWidth(mm(0.15))
-nc.SetClearance(mm(0.13))
+nc.SetClearance(mm(0.1))
 nc.SetViaDiameter(mm(0.4))
 nc.SetViaDrill(mm(0.2))
 
@@ -127,8 +129,8 @@ for ref, c in sorted(comps.items()):
 
 # ---------------------------------------------------------------- automatic placement of the small parts
 fps = {f.GetReference(): f for f in board.GetFootprints()}
-SSD = (3.5, 3.0, 26.5, 34.0)                     # SSD shadow: only parts lower than 2.5 mm
-TALL = {"C41"}
+SSD = (JX - 11.3, 5.0, JX + 11.3, 36.0)          # SSD shadow: only parts lower than 2.5 mm
+TALL = {"C41", "J1"}
 occupied = []
 placed_done = set()
 
@@ -142,7 +144,9 @@ def box(f, margin=0.25):
 def free(b):
     if b[0] < 0.4 or b[1] < 0.4 or b[2] > W - 0.4 or b[3] > H - 0.4:
         return False
-    if b[1] < 5.5 and b[3] > 2.0 and b[0] < 18 and b[2] > 12:   # keep the standoff clear
+    if b[1] < 8.5 and b[3] > 3.0 and b[0] < JX + 3 and b[2] > JX - 3:   # keep the standoff clear
+        return False
+    if b[3] > 27.3 and b[1] < 32.4 and b[0] < 28.8 and b[2] > 19.8:      # PCIe channel: kept for the pairs
         return False
     return all(b[2] <= o[0] or b[0] >= o[2] or b[3] <= o[1] or b[1] >= o[3] for o in occupied)
 
@@ -210,6 +214,71 @@ order = FIRST + [r for r in NEAR if r not in FIRST] + sorted(r for r in fps if r
 for r in order:
     place_small(r)
 
+# ---------------------------------------------------------------- PCIe pairs, routed by hand (script)
+# The chip's PCIe side and the socket's PCIe pins are in the same order (RX1, TX1,
+# RX0, TX0, REFCLK; N then P), so each line goes straight down with one small jog.
+# The 1.0 V pins and REXT between the pairs escape inwards, to vias in the ring
+# between the pins and the exposed pad. TX lines get their 220 nF caps in line,
+# N and P caps staggered so the other line of the pair passes beside them.
+def pad_of(ref, num):
+    for p in fps[ref].Pads():
+        if p.GetNumber() == num:
+            return p
+
+
+def track(a, b, netname, w=0.2, layer=pcbnew.F_Cu):
+    t = pcbnew.PCB_TRACK(board)
+    t.SetStart(P(*a)); t.SetEnd(P(*b)); t.SetWidth(mm(w)); t.SetLayer(layer)
+    t.SetNet(net(netname)); t.SetLocked(True)
+    board.Add(t)
+
+
+def via(x, y, netname, d=0.4, drill=0.2):
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(P(x, y)); v.SetWidth(mm(d)); v.SetDrill(mm(drill)); v.SetNet(net(netname)); v.SetLocked(True)
+    board.Add(v)
+
+
+def xy(p):
+    return pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)
+
+
+ucx, ucy = xy(fps["U1"])
+PAIRS = [("34", "29"), ("35", "31"), ("37", "35"), ("38", "37"), ("41", "41"), ("42", "43"),
+         ("44", "47"), ("45", "49"), ("47", "53"), ("48", "55")]   # (U1 pin, J2 pin)
+CAPS = {"37": ("C37", 0), "38": ("C36", 1), "44": ("C35", 0), "45": ("C34", 1)}   # TX lines: cap, stagger row
+yj = xy(pad_of("J2", "29"))[1]
+y0 = xy(pad_of("U1", "34"))[1] + 0.45            # just past the chip pads
+yjog = y0 + 0.55
+ycap = [yjog + 0.7, yjog + 1.8]
+for up, jp in PAIRS:
+    a, b = pad_of("U1", up), pad_of("J2", jp)
+    (xa, ya), (xb, yb) = xy(a), xy(b)
+    n = a.GetNetname()
+    track((xa, ya), (xa, y0), n)
+    track((xa, y0), (xb, yjog), n)
+    if up in CAPS:
+        ref, row = CAPS[up]
+        c = fps[ref]
+        c.SetOrientationDegrees(90)
+        c.SetPosition(P(xb, ycap[row]))
+        p1, p2 = sorted([q for q in c.Pads() if q.GetNumber() in ('1', '2')], key=lambda p: pcbnew.ToMM(p.GetPosition().y))
+        if p1.GetNetname() != n:                  # pad 1 must face the chip
+            c.SetOrientationDegrees(270)
+            p1, p2 = sorted([q for q in c.Pads() if q.GetNumber() in ('1', '2')], key=lambda p: pcbnew.ToMM(p.GetPosition().y))
+        track((xb, yjog), xy(p1), n)
+        track(xy(p2), (xb, yb), p2.GetNetname())
+    else:
+        track((xb, yjog), (xb, yb), n)
+
+# 1.0 V pins and REXT on the PCIe side: short stub inwards to a via in the ring
+for num, off in (("33", 2.75), ("36", 2.75), ("39", 3.1), ("40", 2.75), ("43", 2.75), ("46", 2.75)):
+    p = pad_of("U1", num)
+    x, y = xy(p)
+    vy = ucy + off
+    track((x, y), (x, vy), p.GetNetname(), 0.15)
+    via(x, vy, p.GetNetname())
+
 # outline with rounded corners
 R = 1.5
 
@@ -263,9 +332,9 @@ plane(pcbnew.In1_Cu, "/GND", 0.3, H - 0.3)
 # In2: VBUS in the bottom part and in a strip up the right edge to the regulator
 # input; +3V3 (SSD) everywhere else. The strip edge falls between U2's VIN and VOUT pads.
 u2 = {p.GetNumber(): pcbnew.ToMM(p.GetPosition().x) for p in fps["U2"].Pads()}
-XB = round((u2["2"] + max(u2["4"], u2["5"])) / 2, 2)
-if not u2["2"] > max(u2["4"], u2["5"]) + 0.3:
-    sys.exit(f"U2 rotation: VIN {u2['2']} must be right of VOUT {u2['4']},{u2['5']}")
+XB = round((u2["2"] + min(u2["4"], u2["5"])) / 2, 2)
+if not u2["2"] < min(u2["4"], u2["5"]) - 0.3:
+    sys.exit(f"U2 rotation: VIN {u2['2']} must be left of VOUT {u2['4']},{u2['5']}")
 
 
 def poly(layer, netname, pts, prio):
@@ -282,16 +351,15 @@ def poly(layer, netname, pts, prio):
     board.Add(z)
 
 
-YV = 44.0
-poly(pcbnew.In2_Cu, "/VBUS", [(0.3, YV), (XB + 0.2, YV), (XB + 0.2, 12.0), (W - 0.3, 12.0), (W - 0.3, H - 0.3), (0.3, H - 0.3)], 1)
-poly(pcbnew.In2_Cu, "/+3V3", [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 11.6), (XB - 0.2, 11.6), (XB - 0.2, YV - 0.4), (0.3, YV - 0.4)], 1)
+poly(pcbnew.In2_Cu, "/VBUS", [(0.3, 0.3), (XB - 0.2, 0.3), (XB - 0.2, H - 0.3), (0.3, H - 0.3)], 1)
+poly(pcbnew.In2_Cu, "/+3V3", [(XB + 0.2, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (XB + 0.2, H - 0.3)], 1)
 
 
 def region_ok(netname, x, y):
     if netname == "/GND":
         return True
-    in_vbus = y > YV + 0.3 or (x > XB + 0.5 and 12.3 < y < YV - 0.3)
-    in_3v3 = (y < YV - 0.7 and x < XB - 0.5) or y < 11.3
+    in_vbus = x < XB - 0.5
+    in_3v3 = x > XB + 0.5
     return in_vbus if netname == "/VBUS" else in_3v3
 
 
@@ -352,11 +420,15 @@ for f in board.GetFootprints():
         fine = min(sx, sy) < 0.5
         if fine:                                     # fine pitch: straight out, perpendicular to the row
             if f.GetReference() == "J1":
-                angles = [-math.pi / 2]              # USB-C: into the board, away from the mouth
-            elif abs(dx) > abs(dy):
-                angles = [0 if dx > 0 else math.pi]
-            else:
-                angles = [math.pi / 2 if dy > 0 else -math.pi / 2]
+                angles = [0.0]                       # USB-C: into the board, away from the mouth
+            else:                                    # along the pad's long axis, away from the part
+                ang = p.GetOrientation().AsDegrees()
+                lx, ly = (sx, sy)
+                vertical = (ly > lx) != (round(ang) % 180 == 90)
+                if vertical:
+                    angles = [math.pi / 2 if dy > 0 else -math.pi / 2]
+                else:
+                    angles = [0 if dx > 0 else math.pi]
             dists = (0.9, 1.1, 1.4, 1.8, 2.2)
         else:
             base = math.atan2(dy, dx) if (dx or dy) else 0
