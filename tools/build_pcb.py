@@ -237,9 +237,9 @@ def track(a, b, netname, w=0.2, layer=pcbnew.F_Cu):
     board.Add(t)
 
 
-def via(x, y, netname, d=0.4, drill=0.2):
+def via(x, y, netname, d=0.4, drill=0.2, locked=True):
     v = pcbnew.PCB_VIA(board)
-    v.SetPosition(P(x, y)); v.SetWidth(mm(d)); v.SetDrill(mm(drill)); v.SetNet(net(netname)); v.SetLocked(True)
+    v.SetPosition(P(x, y)); v.SetWidth(mm(d)); v.SetDrill(mm(drill)); v.SetNet(net(netname)); v.SetLocked(locked)
     board.Add(v)
 
 
@@ -307,7 +307,7 @@ for n_, vx_ in (("A5", 9.35), ("A6", 9.95), ("A7", 9.35)):   # CC1, D+, D-: vias
     x_, y_ = jpad(n_)
     netn = pad_of("J1", n_).GetNetname()
     track((x_, y_), (vx_, y_), netn, 0.2)
-    via(vx_, y_, netn)
+    via(vx_, y_, netn, locked=False)
 
 
 def u(n):
@@ -325,49 +325,59 @@ def place_cap(ref, x, y, net_in):
     return xy(q[0]), xy(q[1]), q[1].GetNetname()     # pad towards the chip, pad towards the connector
 
 
-# TX1: chip 21 (P) / 22 (N) -> C1 / C2 -> A2 / A3, straight on F.Cu
-for pin, cap, cx, jp in (("21", "C1", 17.2, "A2"), ("22", "C2", 15.8, "A3")):
-    (xa, ya) = u(pin)
-    n = pad_of("U1", pin).GetNetname()
-    pin_in, pin_out, n2 = place_cap(cap, cx, ya, n)
-    track((xa, ya), pin_in, n)
-    xj, yj = jpad(jp)
-    track(pin_out, (xj + 1.6, ya), n2)
-    track((xj + 1.6, ya), (xj + 1.6 - abs(yj - ya), yj), n2)
-    track((xj + 1.6 - abs(yj - ya), yj), (xj, yj), n2)
+# Impedance: on the JLC04161H-7628 stack (0.21 mm to the ground plane, er ~4.4), IPC-2141 gives
+# ~94 ohm differential for 0.20 mm tracks 0.10 mm apart (target 90 ohm +-10 %). So the long runs
+# are tightened to 0.30 mm centre to centre; they open up only at the caps and the pads.
+def poly_track(pts, netname, layer=pcbnew.F_Cu, w=0.2):
+    for p0, p1 in zip(pts, pts[1:]):
+        track(p0, p1, netname, w, layer)
 
-# TX2: chip 23 (N) / 24 (P) -> C4 / C3 -> F.Cu left, jog down, vias -> B.Cu -> B3 / B2 vias
-for pin, cap, cx, dy, vx, jp, jx0 in (("23", "C4", 17.2, 0.7, 11.0, "B3", 14.8), ("24", "C3", 15.8, 0.7, 11.6, "B2", 14.97)):
+
+# TX1: chip 21 (P) / 22 (N) -> C1 / C2 -> A2 / A3 on F.Cu
+(xp, yp), (xn, yn) = u("21"), u("22")
+nP, nN = pad_of("U1", "21").GetNetname(), pad_of("U1", "22").GetNetname()
+pinP_in, pinP_out, nP2 = place_cap("C1", 17.2, yp, nP)
+pinN_in, pinN_out, nN2 = place_cap("C2", 15.8, yn, nN)
+track((xp, yp), pinP_in, nP)
+track((xn, yn), pinN_in, nN)
+(xa2, ya2), (xa3, ya3) = jpad("A2"), jpad("A3")
+yc = (yp + yn) / 2
+poly_track([pinP_out, (15.0, yp), (14.95, yc - 0.15), (10.6, yc - 0.15), (10.6 - abs(yc - 0.15 - ya2), ya2), (xa2, ya2)], nP2)
+poly_track([pinN_out, (15.0, yn), (14.95, yc + 0.15), (10.6, yc + 0.15), (10.6 - abs(yc + 0.15 - ya3), ya3), (xa3, ya3)], nN2)
+
+# TX2: chip 23 (N) / 24 (P) -> C4 / C3 -> F.Cu, 45 degree step, vias -> B.Cu -> B3 / B2 vias
+tx2 = {}
+for pin, cap, cx, dy, vx, jx0 in (("23", "C4", 17.2, 0.7, 11.0, 14.8), ("24", "C3", 15.8, 0.7, 11.6, 14.97)):
     (xa, ya) = u(pin)
     n = pad_of("U1", pin).GetNetname()
     pin_in, pin_out, n2 = place_cap(cap, cx, ya, n)
     track((xa, ya), pin_in, n)
-    track(pin_out, (jx0, ya), n2)                   # 45 degree step, P offset so the pair keeps its gap
-    track((jx0, ya), (jx0 - dy, ya + dy), n2)
-    track((jx0 - dy, ya + dy), (vx, ya + dy), n2)
+    poly_track([pin_out, (jx0, ya), (jx0 - dy, ya + dy), (vx, ya + dy)], n2)
     via(vx, ya + dy, n2)
-    xj, yj = jpad(jp)
-    track((vx, ya + dy), (vx, yj), n2, 0.2, pcbnew.B_Cu)
-    track((vx, yj), (xj + BETWEEN, yj), n2, 0.2, pcbnew.B_Cu)
+    tx2[pin] = (vx, ya + dy, n2)
+(vxn, vyn, nn), (vxp, vyp, np_) = tx2["23"], tx2["24"]
+(xb3, yb3), (xb2, yb2) = jpad("B3"), jpad("B2")
+ym = (yb3 + yb2) / 2
+poly_track([(vxn, vyn), (11.15, vyn + 0.15), (11.15, ym - 0.15), (8.2, ym - 0.15), (8.2 - 0.1, yb3), (xb3 + BETWEEN, yb3)], nn, pcbnew.B_Cu)
+poly_track([(vxp, vyp), (11.45, vyp + 0.15), (11.45, ym + 0.15), (8.2, ym + 0.15), (8.2 - 0.1, yb2), (xb2 + BETWEEN, yb2)], np_, pcbnew.B_Cu)
 
 # RX1: chip 26 (P) / 27 (N) -> vias -> B.Cu up and left -> B11 / B10 vias
-for pin, vx, jp in (("26", 16.6, "B11"), ("27", 16.0, "B10")):
-    (xa, ya) = u(pin)
-    n = pad_of("U1", pin).GetNetname()
-    track((xa, ya), (vx, ya), n)
-    via(vx, ya, n)
-    xj, yj = jpad(jp)
-    track((vx, ya), (vx, yj), n, 0.2, pcbnew.B_Cu)
-    track((vx, yj), (xj + BETWEEN, yj), n, 0.2, pcbnew.B_Cu)
+(xp, yp), (xn, yn) = u("26"), u("27")
+nP, nN = pad_of("U1", "26").GetNetname(), pad_of("U1", "27").GetNetname()
+track((xp, yp), (16.6, yp), nP); via(16.6, yp, nP)
+track((xn, yn), (16.0, yn), nN); via(16.0, yn, nN)
+(xb11, yb11), (xb10, yb10) = jpad("B11"), jpad("B10")
+ym = (yb11 + yb10) / 2
+poly_track([(16.6, yp), (16.45, yp - 0.15), (16.45, ym - 0.15), (8.2, ym - 0.15), (8.1, yb11), (xb11 + BETWEEN, yb11)], nP, pcbnew.B_Cu)
+poly_track([(16.0, yn), (16.15, yn - 0.15), (16.15, ym + 0.15), (8.2, ym + 0.15), (8.1, yb10), (xb10 + BETWEEN, yb10)], nN, pcbnew.B_Cu)
 
-# RX2: chip 28 (N) / 29 (P) -> A10 / A11 on F.Cu, one step down with square corners
-for pin, vx, jp in (("28", 17.6, "A10"), ("29", 18.0, "A11")):
-    (xa, ya) = u(pin)
-    n = pad_of("U1", pin).GetNetname()
-    xj, yj = jpad(jp)
-    track((xa, ya), (vx, ya), n)
-    track((vx, ya), (vx, yj), n)
-    track((vx, yj), (xj, yj), n)
+# RX2: chip 28 (N) / 29 (P) -> A10 / A11 on F.Cu, square corners
+(xn, yn), (xp, yp) = u("28"), u("29")
+nN, nP = pad_of("U1", "28").GetNetname(), pad_of("U1", "29").GetNetname()
+(xa10, ya10), (xa11, ya11) = jpad("A10"), jpad("A11")
+ym = (ya10 + ya11) / 2
+poly_track([(xn, yn), (17.7, yn), (17.7, ym - 0.15), (8.9, ym - 0.15), (8.9 - abs(ym - 0.15 - ya10), ya10), (xa10, ya10)], nN)
+poly_track([(xp, yp), (18.0, yp), (18.0, ym + 0.15), (8.9, ym + 0.15), (8.9 - abs(ym + 0.15 - ya11), ya11), (xa11, ya11)], nP)
 
 # power pins on the USB side: stubs inwards to ring vias (staggered)
 for num, off in (("19", 3.1), ("20", 2.75), ("25", 2.75), ("30", 3.1), ("31", 2.75)):   # (33 is below, at 3.1)
@@ -460,10 +470,28 @@ def poly(layer, netname, pts, prio):
 
 plane(pcbnew.In2_Cu, "/GND", 0.3, H - 0.3)
 
+# +1.0 V island on In2 right under the JMS583 (inside the In2 ground plane): every 1.0 V
+# via lands on it, and no track can cut it (In2 is a plane layer, not routed)
+z = pcbnew.ZONE(board)
+z.SetLayer(pcbnew.In2_Cu)
+z.SetNet(net("/+1V0"))
+ol = z.Outline()
+ol.NewOutline()
+R1V = (ucx - 6.4, ucy - 6.4, ucx + 6.4, ucy + 6.4)
+for x, y in ((R1V[0], R1V[1]), (R1V[2], R1V[1]), (R1V[2], R1V[3]), (R1V[0], R1V[3])):
+    ol.Append(mm(x), mm(y))
+z.SetMinThickness(mm(0.2))
+z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+z.SetLocalClearance(mm(0.15))
+z.SetAssignedPriority(2)
+board.Add(z)
+
 
 def region_ok(netname, x, y):
     if netname == "/GND":
         return True
+    if netname == "/+1V0":
+        return R1V[0] + 0.4 < x < R1V[2] - 0.4 and R1V[1] + 0.4 < y < R1V[3] - 0.4
     in_vbus = x < XB - 0.5
     in_3v3 = x > XB + 0.5
     return in_vbus if netname == "/VBUS" else in_3v3
@@ -532,7 +560,9 @@ for f in board.GetFootprints():
         continue
     for p in f.Pads():
         n = p.GetNetname()
-        if n not in ("/GND", "/VBUS", "/+3V3") or p.GetAttribute() not in (pcbnew.PAD_ATTRIB_SMD,):
+        if n not in ("/GND", "/VBUS", "/+3V3", "/+1V0") or p.GetAttribute() not in (pcbnew.PAD_ATTRIB_SMD,):
+            continue
+        if f.GetReference() == "U1" and p.GetNumber() in ("20", "25", "30", "31", "33", "36", "40", "43", "46"):   # ring vias
             continue
         px, py = pcbnew.ToMM(p.GetPosition().x), pcbnew.ToMM(p.GetPosition().y)
         sx, sy = pcbnew.ToMM(p.GetSize().x), pcbnew.ToMM(p.GetSize().y)
@@ -569,7 +599,8 @@ for f in board.GetFootprints():
             for a in angles:
                 x, y = round(px + d * math.cos(a), 2), round(py + d * math.sin(a), 2)
                 tw = 0.18 if fine else 0.25
-                stub_ok = all(clear_of_tracks(px + (x - px) * k, py + (y - py) * k, n, tw / 2) for k in (0.3, 0.6, 1.0))
+                stub_ok = all(clear_of_tracks(px + (x - px) * k, py + (y - py) * k, n, tw / 2) and
+                              (k < 0.25 or clear_of_pads(px + (x - px) * k, py + (y - py) * k, n, tw / 2 + 0.12)) for k in (0.3, 0.45, 0.6, 0.8, 1.0))
                 if region_ok(n, x, y) and clear_of_pads(x, y, n) and clear_of_tracks(x, y, n, 0.2) and stub_ok:
                     add_via(x, y, n, p, tw)
                     done = True
@@ -580,7 +611,7 @@ for f in board.GetFootprints():
 # small silkscreen text; references of passives only on the fab layer
 for f in board.GetFootprints():
     t = f.Reference()
-    t.SetTextSize(P(0.6, 0.6)); t.SetTextThickness(mm(0.1))
+    t.SetTextSize(P(0.8, 0.8)); t.SetTextThickness(mm(0.12))
     f.Value().SetVisible(False)
     if f.GetReference()[0] in "RC" and not f.GetReference().startswith("CE"):
         t.SetLayer(pcbnew.F_Fab)

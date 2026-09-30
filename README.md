@@ -16,7 +16,7 @@ A small USB-C drive for an M.2 2230 NVMe SSD, built around the JMicron JMS583
 bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive for
 [CARTOUCHE](https://cartouche.candygate.eu), a local AI that runs from a USB drive.
 
-**Status:** schematic v0.1 (ERC 0). PCB v0.3 — 36 × 46 mm, 4 layers, all 9 high-speed pairs (5 PCIe, 4 USB 3.2) routed as straight coupled pairs; slow nets autorouted. DRC: 0 schematic mismatch, 4 unconnected and a few spacing items left. **Not ready for fabrication.**
+**Status:** schematic v0.1 (ERC 0). PCB v0.4 — 36 × 46 mm, 4 layers (In1 GND, In2 GND + 1.0 V island), 9 high-speed pairs as straight coupled pairs (USB 0.2/0.1 mm, estimated ≈94 Ω — to be checked with JLCPCB's impedance calculator), GND stitching. DRC: 0 unconnected, 0 schematic mismatch, 2 silkscreen warnings. Fabrication files in `hardware/fab/` (Gerbers zip, JLCPCB BOM and CPL). **Prototype, not verified:** JMS583 must be consigned (0 stock at JLCPCB), CPL rotations to check in the JLCPCB viewer, LED polarity assumed active-low.
 
 ![PCB v0.3, top and bottom copper](docs/images/pcb-v03-top.png) ![bottom](docs/images/pcb-v03-bottom.png)
 

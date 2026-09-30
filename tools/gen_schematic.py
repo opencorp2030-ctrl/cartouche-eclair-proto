@@ -82,17 +82,17 @@ part("J2", "cartouche:APCI0113-P001A", "M.2 key M (2230)", "cartouche:CONN-SMD_A
 # --- USB side passives ---------------------------------------------------------
 R("R1", "5.1k", "C25905", (95, 70), "CC1", "GND")            # Rd: the drive is a USB-C sink
 R("R2", "5.1k", "C25905", (95, 80), "CC2", "GND")
-C("C1", "100nF", "", (110, 95), "U_TXP1", "USB_TX1P", C0201)  # datasheet: 100 nF on each SS TX line
-C("C2", "100nF", "", (110, 105), "U_TXN1", "USB_TX1N", C0201)
-C("C3", "100nF", "", (110, 115), "U_TXP2", "USB_TX2P", C0201)
-C("C4", "100nF", "", (110, 125), "U_TXN2", "USB_TX2N", C0201)
+C("C1", "100nF", "C76934", (110, 95), "U_TXP1", "USB_TX1P", C0201)  # datasheet: 100 nF on each SS TX line
+C("C2", "100nF", "C76934", (110, 105), "U_TXN1", "USB_TX1N", C0201)
+C("C3", "100nF", "C76934", (110, 115), "U_TXP2", "USB_TX2P", C0201)
+C("C4", "100nF", "C76934", (110, 125), "U_TXN2", "USB_TX2N", C0201)
 R("R3", "10k", "C25744", (95, 160), "VBUS", "VBUS_DET")      # VBUS detector on GPIO[6] (datasheet 7.6)
 R("R4", "20k", "C25765", (95, 170), "VBUS_DET", "GND")       # 5 V x 20/30 = 3.33 V
 C("C5", "10uF 25V", "C15850", (80, 185), "VBUS", "GND", C0805)
 C("C6", "100nF", "C1525", (95, 185), "VBUS", "GND")
 
 # --- JMS583 support -------------------------------------------------------------
-part("L1", "Device:L", "4.7uH", "Inductor_SMD:L_1008_2520Metric", "", (150, 60), {1: "LXO", 2: "+1V0"})  # datasheet 5.3.5
+part("L1", "Device:L", "4.7uH", "Inductor_SMD:L_1008_2520Metric", "C383386", (150, 60), {1: "LXO", 2: "+1V0"})  # datasheet 5.3.5
 C("C7", "22uF", "C45783", (165, 45), "+1V0", "GND", C0805)
 C("C8", "10uF", "C15525", (175, 45), "+1V0", "GND")
 for i, x in enumerate(range(185, 185 + 12 * 10, 10)):                 # one 100 nF per 1.0 V pin (3 VCCK + 9 AVDDL)
