@@ -1,17 +1,5 @@
 # CARTOUCHE Drive
 
-> [!CAUTION]
-> **NOT OPEN SOURCE — ALL RIGHTS RESERVED.**
-> This prototype is published **for information and documentation only**, and so that the manufacturer can access the files.
-> The files are public, but they are **not** licensed for reuse: you may look at them, you may **not** manufacture this board,
-> have it manufactured by anyone, sell it, or distribute hardware derived from it. Any unauthorized manufacture will be
-> pursued, including by filing a complaint.
->
-> **CE PROJET N’EST PAS OPEN SOURCE — TOUS DROITS RÉSERVÉS.**
-> Ce prototype est en ligne **uniquement à des fins d’information et de documentation**, et pour l’usine qui le fabrique.
-> Il est **formellement interdit** de le fabriquer, de le faire fabriquer par qui que ce soit, de le vendre ou de diffuser
-> un matériel qui en dérive. Toute fabrication non autorisée fera l’objet de poursuites, y compris d’un dépôt de plainte.
-
 A small USB-C drive for an M.2 2230 NVMe SSD, built around the JMicron JMS583
 bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive for
 [CARTOUCHE](https://cartouche.candygate.eu), a local AI that runs from a USB drive.
@@ -47,6 +35,6 @@ bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive fo
 
 ## License
 
-© 2026 CARTOUCHE. All rights reserved — see [LICENSE](LICENSE). No license is granted to manufacture, have manufactured,
-sell or redistribute this design or the tools in this repository. Third-party libraries used in the KiCad project
-(KiCad standard libraries, LCSC/EasyEDA footprints and 3D models) stay under their own licenses.
+Open source. Hardware (`hardware/`, `docs/`): [CERN-OHL-S-2.0](LICENSE-HARDWARE). Tools (`tools/`): MIT.
+See [LICENSE](LICENSE). Third-party libraries used in the KiCad project (KiCad standard libraries, LCSC/EasyEDA
+footprints and 3D models) stay under their own licenses.
