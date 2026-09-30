@@ -1,0 +1,24 @@
+CARTOUCHE Drive — Copyright (c) 2026 CARTOUCHE. All rights reserved.
+
+This repository is published for information and documentation purposes only,
+and to give the manufacturer access to the production files.
+
+No license is granted. Without prior written permission, you may NOT:
+  - manufacture this design or any part of it, or have it manufactured by a third party;
+  - sell, rent or distribute hardware made from this design or derived from it;
+  - copy, modify or redistribute the design files or the tools in this repository.
+
+Viewing the files on this page is allowed. Any unauthorized manufacture or use
+will be pursued, including by filing a complaint.
+
+Third-party material (KiCad standard libraries, LCSC/EasyEDA footprints and
+3D models) remains under its own license.
+
+---
+
+Copyright (c) 2026 CARTOUCHE. Tous droits réservés.
+Ce dépôt est public uniquement à des fins d'information et de documentation, et
+pour permettre à l'usine d'accéder aux fichiers de production. Aucune licence
+n'est accordée : il est formellement interdit de fabriquer ce circuit, de le faire
+fabriquer, de le vendre ou d'en diffuser un dérivé sans autorisation écrite.
+Toute fabrication non autorisée fera l'objet de poursuites, y compris d'un dépôt de plainte.
