@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "cartouche")(type "KiCad")(uri "${KIPRJMOD}/lib/cartouche.kicad_sym")(options "")(descr "CARTOUCHE Drive parts (from LCSC/EasyEDA)"))
+)

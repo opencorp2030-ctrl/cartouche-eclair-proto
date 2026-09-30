@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "cartouche")(type "KiCad")(uri "${KIPRJMOD}/lib/cartouche.pretty")(options "")(descr "CARTOUCHE Drive footprints (from LCSC/EasyEDA)"))
+)

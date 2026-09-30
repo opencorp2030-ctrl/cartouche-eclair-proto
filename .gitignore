@@ -1,0 +1,11 @@
+# KiCad
+*-backups/
+*.kicad_prl
+fp-info-cache
+*.lck
+_autosave-*
+hardware/erc.rpt
+hardware/*.net
+# never commit vendor datasheets (copyrighted) — link them in the README
+*.pdf
+!hardware/cartouche-drive-schematic.pdf
