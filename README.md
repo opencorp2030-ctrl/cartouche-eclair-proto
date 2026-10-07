@@ -1,5 +1,7 @@
 # CARTOUCHE Drive
 
+[![Upload to - AISLER](https://img.shields.io/badge/Upload_to_-AISLER-ff8000)](https://aisler.net/p/new?url=https://raw.githubusercontent.com/opencorp2030-ctrl/cartouche-eclair-proto/main/hardware/cartouche-drive.kicad_pcb&ref=github)
+
 A small USB-C drive for an M.2 2230 NVMe SSD, built around the JMicron JMS583
 bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive for
 [CARTOUCHE](https://cartouche.candygate.eu), a local AI that runs from a USB drive.
@@ -32,6 +34,15 @@ bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive fo
 
 - JMS583 datasheet PDS-17001 rev 1.0 (JMicron) — pin-out and required parts
 - Part footprints: LCSC / EasyEDA libraries (LOTES C841669, Molex C134092, TPS82130 C473914)
+
+## Sponsors
+
+Thank you to the companies that support this open-source board:
+
+- **[AISLER](https://aisler.net)** sponsors the PCBs for this project (250 € of boards and stencils, made in Europe). The AISLER logo is printed on the back of the board (placeholder on `B.Silkscreen`, `tools/aisler_logo.py`). Order your own with the button above.
+- **[JMicron](https://www.jmicron.com)**, through its distributor **[BONMECK](https://www.bonmeck.com)**, provides free JMS583 bridge chip samples for the first prototypes.
+
+Results of the prototypes, good or bad, will be published here.
 
 ## License
 
