@@ -39,7 +39,9 @@ bridge (USB 3.2 Gen 2, 10 Gb/s → PCIe Gen 3 ×2). It is the prototype drive fo
 
 Thank you to the companies that support this open-source board:
 
-- **[AISLER](https://aisler.net)** sponsors the PCBs for this project (250 € of boards and stencils, made in Europe). The AISLER logo is printed on the back of the board (placeholder on `B.Silkscreen`, `tools/aisler_logo.py`). Order your own with the button above.
+<a href="https://aisler.net"><img src="docs/images/aisler-logo.svg" alt="AISLER" width="260"></a>
+
+- **[AISLER](https://aisler.net) is the PCB sponsor of this project** (boards, stencils and shipping, made in Europe). The AISLER logo is printed on the back of the board (placeholder on `B.Silkscreen`, `tools/aisler_logo.py`). Order your own with the button above.
 - **[JMicron](https://www.jmicron.com)**, through its distributor **[BONMECK](https://www.bonmeck.com)**, provides free JMS583 bridge chip samples for the first prototypes.
 
 Results of the prototypes, good or bad, will be published here.
